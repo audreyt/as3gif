@@ -7,6 +7,7 @@ package org.bytearray.gif.player
     import mx.controls.Image;
     import mx.core.UIComponent;
     
+    import org.bytearray.gif.events.FileTypeEvent;
     import org.bytearray.gif.events.GIFPlayerEvent;
 
     public class GIFImage extends UIComponent
@@ -35,23 +36,33 @@ package org.bytearray.gif.player
                 _player.bitmapData.dispose();
             }
 
+            _source = src;
+
             if (/\.gif$/i.test(src)) {
-                if (!_player) {
-                    _player = new GIFPlayer();
-                    _player.addEventListener(GIFPlayerEvent.COMPLETE, onCompleteGIF);
-                }
-                setChild(_player);
-                _player.load(new URLRequest(src));
+                doLoadPlayer();
             }
             else {
-                if (!_image) {
-                    _image = new Image();
-                    _image.addEventListener(Event.COMPLETE, onCompleteImage);
-                }
-                setChild(_image);
-                _image.source = src;
+                doLoadImage();
             }
-            _source = src;
+        }
+
+        private function doLoadPlayer (event:Event=null):void {
+            if (!_player) {
+                _player = new GIFPlayer();
+                _player.addEventListener(GIFPlayerEvent.COMPLETE, onCompleteGIF);
+                _player.addEventListener(FileTypeEvent.INVALID, doLoadImage);
+            }
+            setChild(_player);
+            _player.load(new URLRequest(_source));
+        }
+
+        private function doLoadImage (event:Event=null):void {
+            if (!_image) {
+                _image = new Image();
+                _image.addEventListener(Event.COMPLETE, onCompleteImage);
+            }
+            setChild(_image);
+            _image.source = _source;
         }
 
         private function onCompleteImage(event:Event):void {
