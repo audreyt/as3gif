@@ -6,11 +6,13 @@ package org.bytearray.gif.frames
 	{
 		public var bitmapData:BitmapData;
 		public var delay:int;
+        public var dispose:int;
 			
-		public function GIFFrame( pImage:BitmapData, pDelay:int )	
+		public function GIFFrame( pImage:BitmapData, pDelay:int, pDispose:int )	
 		{
 			bitmapData = pImage;
 			delay = pDelay;	
+            dispose = pDispose;
 		}
 	}
 }

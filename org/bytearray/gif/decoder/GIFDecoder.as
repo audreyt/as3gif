@@ -779,7 +779,7 @@ package org.bytearray.gif.decoder
 			
 			transferPixels(); // transfer pixel data to image
 
-			frames.push ( new GIFFrame (bitmap, delay) ); // add image to frame list
+			frames.push ( new GIFFrame (bitmap, delay, lastDispose) ); // add image to frame list
 
 			if (transparency) act[transIndex] = save;
 			

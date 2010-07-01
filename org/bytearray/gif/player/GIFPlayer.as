@@ -6,37 +6,40 @@
 
 package org.bytearray.gif.player
 {	
-	import flash.events.TimerEvent;
-	import flash.net.URLLoaderDataFormat;
-	import flash.net.URLLoader;
-	import flash.net.URLRequest;
+	import flash.display.Bitmap;
+	import flash.display.BitmapData;
+	import flash.errors.ScriptTimeoutError;
 	import flash.events.Event;
+	import flash.events.IOErrorEvent;
+	import flash.events.TimerEvent;
+	import flash.net.URLLoader;
+	import flash.net.URLLoaderDataFormat;
+	import flash.net.URLRequest;
 	import flash.system.LoaderContext;
 	import flash.utils.ByteArray;
 	import flash.utils.Timer;
-	import flash.display.Bitmap;
-	import flash.display.BitmapData;
 	import flash.utils.getTimer;
-	import flash.events.IOErrorEvent;
-	import flash.errors.ScriptTimeoutError;
-	import org.bytearray.gif.frames.GIFFrame;
+	
 	import org.bytearray.gif.decoder.GIFDecoder;
-	import org.bytearray.gif.events.GIFPlayerEvent;
-	import org.bytearray.gif.events.FrameEvent;
-	import org.bytearray.gif.events.TimeoutEvent;
-	import org.bytearray.gif.events.FileTypeEvent;
 	import org.bytearray.gif.errors.FileTypeError;
+	import org.bytearray.gif.events.FileTypeEvent;
+	import org.bytearray.gif.events.FrameEvent;
+	import org.bytearray.gif.events.GIFPlayerEvent;
+	import org.bytearray.gif.events.TimeoutEvent;
+	import org.bytearray.gif.frames.GIFFrame;
 	
 	public class GIFPlayer extends Bitmap
 	{
 		private var urlLoader:URLLoader;
-		private var gifDecoder:GIFDecoder
 		private var aFrames:Array;
 		private var myTimer:Timer;
 		private var iInc:int;
 		private var iIndex:int;
 		private var auto:Boolean;
 		private var arrayLng:uint;
+        private var source:String;
+        private var _loopCount:int;
+        private static var byteStreamCache:Object = {};
 		
 		public function GIFPlayer ( pAutoPlay:Boolean = true )
 		{
@@ -52,8 +55,6 @@ package org.bytearray.gif.player
 			urlLoader.addEventListener ( IOErrorEvent.IO_ERROR, onIOError );
 			
 			myTimer.addEventListener ( TimerEvent.TIMER, update );
-			
-			gifDecoder = new GIFDecoder();
 		}
 		
 		private function onIOError ( pEvt:IOErrorEvent ):void
@@ -63,16 +64,18 @@ package org.bytearray.gif.player
 		
 		private function onComplete ( pEvt:Event ):void 
 		{
+            byteStreamCache[this.source] = ByteArray(pEvt.target.data);
 			readStream ( pEvt.target.data );	
 		}
 		
 		private function readStream ( pBytes:ByteArray ):void
 		{
 			var gifStream:ByteArray = pBytes;
-			
+
 			aFrames = new Array;
 			iInc = 0;
-			
+
+            var gifDecoder:GIFDecoder = new GIFDecoder();
 			try 
 			{
 				gifDecoder.read ( gifStream );
@@ -85,7 +88,8 @@ package org.bytearray.gif.player
 				arrayLng = aFrames.length;
 				
 				auto ? play() : gotoAndStop (1);
-				
+                _loopCount = gifDecoder.getLoopCount();	
+
 				dispatchEvent ( new GIFPlayerEvent ( GIFPlayerEvent.COMPLETE , aFrames[0].bitmapData.rect ) );
 
 			} catch ( e:ScriptTimeoutError )
@@ -105,20 +109,25 @@ package org.bytearray.gif.player
 		
 		private function update ( pEvt:TimerEvent ) :void
 		{
-			var delay:int = aFrames[ int(iIndex = iInc++ % arrayLng) ].delay;
+            var frame:GIFFrame = aFrames[ int(iIndex = iInc++ % arrayLng) ];
+			var delay:int = frame.delay;
 			
 			pEvt.target.delay = ( delay > 0 ) ? delay : 100;
-			
-			switch ( gifDecoder.disposeValue ) 
+
+			switch ( frame.dispose ) 
 			{		
 				case 1:
-					if ( !iIndex ) 
+					if ( !iIndex ) {
 						bitmapData = aFrames[ 0 ].bitmapData.clone();
+                    }
 					bitmapData.draw ( aFrames[ iIndex ].bitmapData );
-					break
+					break;
 				case 2:
 					bitmapData = aFrames[ iIndex ].bitmapData;
 					break;
+                default:
+                    bitmapData = aFrames[ iIndex ].bitmapData;
+                    break;
 			}
 			
 			dispatchEvent ( new FrameEvent ( FrameEvent.FRAME_RENDERED, aFrames[ iIndex ] ) );
@@ -141,7 +150,16 @@ package org.bytearray.gif.player
 		*/
 		public function load ( pRequest:URLRequest ):void
 		{
+            this.source = pRequest.url;
 			stop();
+            if (byteStreamCache[this.source]) {
+                var b:ByteArray = new ByteArray();
+                ByteArray(byteStreamCache[this.source]).position = 0;
+                b.writeBytes(byteStreamCache[this.source]);
+                b.position = 0;
+                loadBytes(b);
+                return;
+            }
 			urlLoader.load ( pRequest );	
 		}
 		
@@ -209,7 +227,7 @@ package org.bytearray.gif.player
 		*/
 		public function get loopCount ():int
 		{
-			return gifDecoder.getLoopCount();	
+			return _loopCount;
 		}
 		
 		/**
@@ -244,7 +262,7 @@ package org.bytearray.gif.player
 				if ( pFrame == currentFrame ) return;
 				iIndex = iInc = int(int(pFrame)-1);
 				
-				switch ( gifDecoder.disposeValue ) 
+				switch ( aFrames[ pFrame ].dispose ) 
 				{
 					case 1:
 						bitmapData = aFrames[ 0 ].bitmapData.clone();
@@ -273,7 +291,7 @@ package org.bytearray.gif.player
 				if ( pFrame == currentFrame ) return;
 				iIndex = iInc = int(int(pFrame)-1);
 				
-				switch ( gifDecoder.disposeValue ) 
+				switch ( aFrames[ pFrame ].dispose ) 
 				{	
 					case 1:
 						bitmapData = aFrames[ 0 ].bitmapData.clone();
